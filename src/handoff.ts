@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { BrowserSurface } from "./surface.js";
+import type { Surface } from "./surface.js";
 import type { InterventionRequest } from "./types.js";
 import type { RunLogger } from "./logger.js";
 
@@ -28,7 +28,7 @@ export class HandoffCoordinator {
     private readonly timeoutMs = 10 * 60_000
   ) {}
 
-  async request(surface: BrowserSurface, context: HandoffContext): Promise<HandoffResult> {
+  async request(surface: Surface, context: HandoffContext): Promise<HandoffResult> {
     const interventionId = `int-${crypto.randomUUID()}`;
     const request: InterventionRequest = {
       id: interventionId,
@@ -57,7 +57,9 @@ export class HandoffCoordinator {
 
     if (!this.interactive) return { interventionId, resumed: false };
 
-    await this.captureHumanActions(surface, interventionId);
+    await surface.captureHumanActions(interventionId, async (event: unknown) => {
+      await this.logger.log("handoff", "human_action", { interventionId, event });
+    });
     let resume!: () => void;
     const resumed = new Promise<void>((resolve) => {
       resume = resolve;
@@ -98,16 +100,6 @@ export class HandoffCoordinator {
     return { interventionId, resumed: didResume, operatorUrl };
   }
 
-  private async captureHumanActions(surface: BrowserSurface, interventionId: string): Promise<void> {
-    const bindingName = `__captureHumanAction_${interventionId.replaceAll("-", "_")}`;
-    await surface.page.exposeFunction(bindingName, async (event: unknown) => {
-      await this.logger.log("handoff", "human_action", { interventionId, event });
-    });
-    const source = await readFile(new URL("./browser/capture-human.js", import.meta.url), "utf8");
-    const boundSource = source.replace("__BINDING_NAME_JSON__", JSON.stringify(bindingName));
-    await surface.page.addInitScript({ content: boundSource });
-    await surface.page.evaluate(boundSource);
-  }
 }
 
 const escapeHtml = (value: string): string =>

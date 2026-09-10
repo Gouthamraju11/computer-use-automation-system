@@ -4,7 +4,7 @@ import { assertInputs, parseOutput } from "./artifact.js";
 import type { HandoffCoordinator } from "./handoff.js";
 import type { RunLogger } from "./logger.js";
 import { PolicyEngine } from "./policy.js";
-import type { BrowserSurface } from "./surface.js";
+import type { Surface } from "./surface.js";
 import type {
   CapabilityArtifact,
   CapabilityStep,
@@ -16,7 +16,7 @@ export interface ReplayOptions {
   artifact: CapabilityArtifact;
   inputs: Record<string, unknown>;
   targetOrigin?: string;
-  surface: BrowserSurface;
+  surface: Surface;
   logger: RunLogger;
   handoff: HandoffCoordinator;
   runDirectory: string;
@@ -28,6 +28,7 @@ export async function replay(options: ReplayOptions): Promise<RunResult> {
   const policy = new PolicyEngine(artifact.policy);
   const recoveries = new Map<string, number>();
   const outputs: Record<string, unknown> = {};
+  let activeStep: CapabilityStep | undefined;
   await mkdir(options.runDirectory, { recursive: true });
 
   try {
@@ -45,20 +46,25 @@ export async function replay(options: ReplayOptions): Promise<RunResult> {
     });
 
     for (const step of artifact.steps) {
+      activeStep = step;
       policy.assertUrl(options.surface.currentUrl());
       const exception = await handleExceptions(options, step, recoveries);
       if (exception !== undefined) return writeAndReturn(options, exception);
+
+      const effectiveRisk = step.risk === "risky" || policy.classify(step.action, step.target) === "risky"
+        ? "risky"
+        : "safe";
 
       const preScreenshot = join(options.runDirectory, `${step.id}-before.png`);
       await options.surface.observe(preScreenshot);
       await options.logger.log("replay", "step_started", {
         action: step.action,
         description: step.description,
-        risk: step.risk,
+        risk: effectiveRisk,
         url: options.surface.currentUrl()
       }, step.id);
 
-      if (step.risk === "risky") {
+      if (effectiveRisk === "risky") {
         const handoff = await options.handoff.request(options.surface, {
           runId,
           capabilityId: artifact.capability.id,
@@ -119,7 +125,10 @@ export async function replay(options: ReplayOptions): Promise<RunResult> {
       : new ReplayFailure("REPLAY_FAILED", error instanceof Error ? error.message : String(error));
     const screenshotPath = join(options.runDirectory, "failure.png");
     const observation = await options.surface.observe(screenshotPath).catch(() => undefined);
-    const stepId = failure.stepId;
+    const stepId = failure.stepId ?? activeStep?.id;
+    const expected = failure.expected ?? (activeStep === undefined
+      ? undefined
+      : { action: activeStep.action, description: activeStep.description });
     const handoff = await options.handoff.request(options.surface, {
       runId,
       capabilityId: artifact.capability.id,
@@ -134,7 +143,7 @@ export async function replay(options: ReplayOptions): Promise<RunResult> {
       code: failure.code,
       message: failure.message,
       ...(stepId === undefined ? {} : { stepId }),
-      ...(failure.expected === undefined ? {} : { expected: failure.expected }),
+      ...(expected === undefined ? {} : { expected }),
       ...(observation === undefined
         ? {}
         : { observed: options.logger.redact({ url: observation.url, title: observation.title }) }),

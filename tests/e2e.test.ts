@@ -11,7 +11,7 @@ import { Redactor } from "../src/redaction.js";
 import { replay } from "../src/replay.js";
 import { BrowserSurface } from "../src/surface.js";
 import { startTargetServer } from "../src/target/server.js";
-import type { AgentDecision, PolicyConfig, RunResult } from "../src/types.js";
+import type { AgentDecision, CapabilityArtifact, CapabilityStep, PolicyConfig, RunResult } from "../src/types.js";
 
 const chromePath = process.env.CHROME_PATH ?? (process.platform === "darwin"
   ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -124,7 +124,9 @@ test("discovery records a parameterized artifact and deterministic replay handle
       assert.ok(denied.interventionId, "hard failures must route an intervention request");
     }
 
-    await verifyInteractiveHandoff();
+    await verifyRiskReclassification(artifact);
+    await verifyFailureContext(artifact);
+    await verifyInteractiveHandoff(artifact);
   } finally {
     await new Promise<void>((resolveClose, rejectClose) =>
       server.close((error) => (error ? rejectClose(error) : resolveClose()))
@@ -152,34 +154,110 @@ async function runReplay(artifactPath: string, memberId: string, name: string): 
   }
 }
 
-async function verifyInteractiveHandoff(): Promise<void> {
+async function verifyRiskReclassification(baseArtifact: CapabilityArtifact): Promise<void> {
+  const directory = join(testRoot, "risk-reclassification");
+  const logger = new RunLogger("test-risk-reclassification", join(directory, "events.jsonl"), new Redactor());
+  const surface = await BrowserSurface.launch({ headless: true, chromePath });
+  const artifact = singleStepArtifact(baseArtifact, riskyCloseStep("safe"), "/member/10001");
+  const coordinator = new HandoffCoordinator(logger, false);
+  try {
+    const result = await replay({ artifact, inputs: {}, surface, logger, handoff: coordinator, runDirectory: directory });
+    assert.equal(result.status, "failure");
+    if (result.status === "failure") {
+      assert.equal(result.code, "INTERVENTION_REQUIRED");
+      assert.equal(result.stepId, "risky-step");
+    }
+    const log = await readFile(join(directory, "events.jsonl"), "utf8");
+    assert.match(log, /"risk":"risky"/);
+  } finally {
+    await surface.close();
+  }
+}
+
+async function verifyFailureContext(baseArtifact: CapabilityArtifact): Promise<void> {
+  const directory = join(testRoot, "failure-context");
+  const logger = new RunLogger("test-failure-context", join(directory, "events.jsonl"), new Redactor());
+  const surface = await BrowserSurface.launch({ headless: true, chromePath });
+  const missingTargetStep: CapabilityStep = {
+    id: "missing-target-step",
+    action: "click",
+    description: "Open a control that is not present",
+    risk: "safe",
+    timeoutMs: 1_000,
+    target: {
+      strategies: [{ kind: "role", role: "button", name: "Missing control", exact: true }],
+      robustness: "Semantic locator used to exercise structured failure context."
+    }
+  };
+  const artifact = singleStepArtifact(baseArtifact, missingTargetStep, "/");
+  const coordinator = new HandoffCoordinator(logger, false);
+  try {
+    const result = await replay({ artifact, inputs: {}, surface, logger, handoff: coordinator, runDirectory: directory });
+    assert.equal(result.status, "failure");
+    if (result.status === "failure") {
+      assert.equal(result.stepId, "missing-target-step");
+      assert.deepEqual(result.expected, {
+        action: "click",
+        description: "Open a control that is not present"
+      });
+      assert.ok(result.observed);
+    }
+  } finally {
+    await surface.close();
+  }
+}
+
+async function verifyInteractiveHandoff(baseArtifact: CapabilityArtifact): Promise<void> {
   const directory = join(testRoot, "interactive-handoff");
   const logPath = join(directory, "events.jsonl");
   const logger = new RunLogger("test-handoff", logPath, new Redactor());
   const surface = await BrowserSurface.launch({ headless: true, chromePath });
-  await surface.open(`${origin}/member/10001`);
-  await surface.observe(join(directory, "handoff.png"));
   const coordinator = new HandoffCoordinator(logger, true, 5_000);
+  const artifact = singleStepArtifact(baseArtifact, riskyCloseStep("risky"), "/member/10001");
   try {
-    const pending = coordinator.request(surface, {
-      runId: "test-handoff",
-      capabilityId: "test-capability",
-      stepId: "risky-step",
-      reason: "A risky action needs a human decision",
-      screenshotPath: join(directory, "handoff.png"),
-      evidenceDirectory: directory
-    });
+    const pending = replay({ artifact, inputs: {}, surface, logger, handoff: coordinator, runDirectory: directory });
     const operatorUrl = await waitForOperatorUrl(logPath);
     await surface.page.getByRole("button", { name: "Close account", exact: true }).click();
     await fetch(`${operatorUrl}/resume`, { method: "POST", redirect: "manual" });
     const result = await pending;
-    assert.equal(result.resumed, true);
+    assert.equal(result.status, "success");
     const log = await readFile(logPath, "utf8");
     assert.match(log, /"event":"human_action"/);
+    assert.match(log, /"owner":"human"/);
     assert.match(log, /"owner":"automation"/);
+    assert.match(log, /"event":"run_completed"/);
   } finally {
     await surface.close();
   }
+}
+
+function riskyCloseStep(risk: "safe" | "risky"): CapabilityStep {
+  return {
+    id: "risky-step",
+    action: "click",
+    description: "Close the member account",
+    risk,
+    timeoutMs: 10_000,
+    target: {
+      strategies: [{ kind: "role", role: "button", name: "Close account", exact: true }],
+      robustness: "Semantic role and exact operator-facing name."
+    }
+  };
+}
+
+function singleStepArtifact(
+  baseArtifact: CapabilityArtifact,
+  step: CapabilityStep,
+  entryPath: string
+): CapabilityArtifact {
+  const artifact = structuredClone(baseArtifact);
+  artifact.target.entryPath = entryPath;
+  artifact.contract.inputs = {};
+  artifact.contract.outputs = {};
+  artifact.steps = [step];
+  artifact.successCondition = { kind: "text_present", text: "Member Details" };
+  artifact.exceptionRules = [];
+  return artifact;
 }
 
 async function waitForOperatorUrl(logPath: string): Promise<string> {

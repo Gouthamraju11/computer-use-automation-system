@@ -6,7 +6,7 @@ import type { HandoffCoordinator } from "./handoff.js";
 import type { DecisionProvider } from "./llm.js";
 import type { RunLogger } from "./logger.js";
 import { PolicyEngine } from "./policy.js";
-import type { BrowserSurface } from "./surface.js";
+import type { Surface } from "./surface.js";
 import type {
   AgentDecision,
   CapabilityArtifact,
@@ -25,7 +25,7 @@ export interface DiscoveryOptions {
   parameters: Record<string, unknown>;
   policy: PolicyConfig;
   provider: DecisionProvider;
-  surface: BrowserSurface;
+  surface: Surface;
   logger: RunLogger;
   handoff: HandoffCoordinator;
   runDirectory: string;
@@ -384,7 +384,7 @@ function parameterize(text: string, parameters: Record<string, unknown>): string
   return output;
 }
 
-async function observe(surface: BrowserSurface, directory: string, index: number): Promise<Observation> {
+async function observe(surface: Surface, directory: string, index: number): Promise<Observation> {
   return surface.observe(join(directory, `observation-${String(index).padStart(2, "0")}.png`));
 }
 

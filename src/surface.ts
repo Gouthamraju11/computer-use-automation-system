@@ -20,6 +20,7 @@ export interface Surface {
   verify(predicate: Predicate): Promise<boolean>;
   hasText(text: string): Promise<boolean>;
   currentUrl(): string;
+  captureHumanActions(captureId: string, onAction: (event: unknown) => Promise<void>): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -231,6 +232,18 @@ export class BrowserSurface implements Surface {
           return false;
         }
     }
+  }
+
+  async captureHumanActions(
+    captureId: string,
+    onAction: (event: unknown) => Promise<void>
+  ): Promise<void> {
+    const bindingName = `__captureHumanAction_${captureId.replaceAll("-", "_")}`;
+    await this.page.exposeFunction(bindingName, onAction);
+    const source = await readFile(new URL("./browser/capture-human.js", import.meta.url), "utf8");
+    const boundSource = source.replace("__BINDING_NAME_JSON__", JSON.stringify(bindingName));
+    await this.page.addInitScript({ content: boundSource });
+    await this.page.evaluate(boundSource);
   }
 
   async close(): Promise<void> {
