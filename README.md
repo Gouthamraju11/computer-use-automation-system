@@ -79,19 +79,3 @@ The checked-in discovery evidence was produced by a real structured model CLI wi
 - `evidence/*/events.jsonl` and `result.json` show discovery, success, recovery, business outcome, and hard failure.
 
 Evidence files persist no raw model transcript, invocation-specific member number, or balance. Sensitive runtime values remain available to the caller in memory/stdout, while persisted results redact them. Screenshots mask input and table-value cells.
-
-## How to defend the design
-
-**Why not save the model's selectors?** The model sees ephemeral element refs. The trusted surface adapter owns selector construction and records ordered semantic/relational fallbacks, so malformed model output cannot silently become executable selectors.
-
-**Where is determinism?** Replay reads typed inputs, iterates fixed steps, resolves saved locators in order, applies bounded waits/recoveries, and verifies the saved checkpoint. `src/replay.ts` never receives a decision provider.
-
-**Why is “not found” not an exception?** It is a legitimate domain answer. The result union makes `business_outcome` distinct from both `success` and `failure`, so callers do not retry or page an operator incorrectly.
-
-**What happens on permission denial?** Replay captures masked evidence, writes an intervention request, transfers the control lease to a human, and stops acting. In interactive mode it rescans the state after control returns and continues only if the operator resolved the block.
-
-**Why semantic locators plus fallbacks?** Role/name and associated labels survive markup rearrangement better than CSS. The table output uses a label-relative locator, so the balance value is never used as a selector. CSS is last because legacy pages sometimes leave no better option.
-
-**What keeps sensitive data out of the artifact?** Typed actions store `{{memberId}}`, not the runtime ID; descriptions and URLs are parameterized/redacted; output contracts store types, not values; logs hash full visible text and persist only redacted element labels.
-
-See [REPORT.md](REPORT.md) for the full trade-off discussion and cut line.
