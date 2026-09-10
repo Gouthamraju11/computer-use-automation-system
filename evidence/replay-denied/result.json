@@ -1,0 +1,14 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-09-10T21-27-33-978Z-1c8a8ca6",
+  "code": "PERMISSION_DENIED",
+  "message": "The active operator is not authorized to view this record",
+  "stepId": "step-03",
+  "expected": "authorized application state",
+  "observed": {
+    "url": "http://127.0.0.1:4173/results?memberId=[REDACTED_INPUT]",
+    "text": "Permission denied"
+  },
+  "evidencePath": "./evidence/replay-denied/step-03-hard-failure.png",
+  "interventionId": "int-f2bb5533-c570-482c-bbed-be841db34cf3"
+}

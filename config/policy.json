@@ -1,0 +1,9 @@
+{
+  "allowedOrigins": ["http://127.0.0.1:4173", "http://localhost:4173"],
+  "allowedRoutePatterns": ["^/$", "^/results$", "^/member/[0-9]+$"],
+  "allowedActions": ["navigate", "click", "type", "extract", "wait"],
+  "riskyControlPatterns": ["confirm", "submit transfer", "close account", "delete", "send payment"],
+  "blockedInputPatterns": ["password", "token", "secret", "ssn", "social security"],
+  "maxSteps": 12,
+  "timeoutMs": 60000
+}

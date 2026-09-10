@@ -1,0 +1,11 @@
+{
+  "id": "int-f2bb5533-c570-482c-bbed-be841db34cf3",
+  "runId": "replay-2026-09-10T21-27-33-978Z-1c8a8ca6",
+  "capabilityId": "look-up-member-value-and-read-their-current-savings-ba-200ade83",
+  "stepId": "step-03",
+  "reason": "The active operator is not authorized to view this record",
+  "screenshotPath": "./evidence/replay-denied/step-03-hard-failure.png",
+  "observedUrl": "http://127.0.0.1:4173/results?memberId=[REDACTED_INPUT]",
+  "control": "human",
+  "requestedAt": "2026-09-10T21:27:41.473Z"
+}

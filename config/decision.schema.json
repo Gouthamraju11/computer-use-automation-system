@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "targetRef",
+    "valueTemplate",
+    "outputName",
+    "outputType",
+    "parser",
+    "timeoutMs",
+    "checkpoint",
+    "description",
+    "reason"
+  ],
+  "properties": {
+    "action": { "enum": ["click", "type", "extract", "wait", "complete", "escalate"] },
+    "targetRef": { "type": ["string", "null"] },
+    "valueTemplate": { "type": ["string", "null"] },
+    "outputName": { "type": ["string", "null"] },
+    "outputType": { "enum": ["string", "number", "boolean", null] },
+    "parser": { "enum": ["text", "number", "currency", "boolean", null] },
+    "timeoutMs": { "type": ["integer", "null"], "minimum": 100, "maximum": 5000 },
+    "checkpoint": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "text", "pattern"],
+      "properties": {
+        "kind": { "enum": ["text_present", "url_matches"] },
+        "text": { "type": ["string", "null"] },
+        "pattern": { "type": ["string", "null"] }
+      }
+    },
+    "description": { "type": "string" },
+    "reason": { "type": "string" }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "status": "success",
+  "runId": "[REDACTED_TOKEN]",
+  "outputs": {
+    "savingsBalance": "[REDACTED_OUTPUT]"
+  },
+  "checkpointVerified": true
+}

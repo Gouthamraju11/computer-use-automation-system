@@ -1,0 +1,25 @@
+{
+  "name": "computer-use-automation-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LLM discovery to deterministic UI capability replay",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts",
+    "target": "tsx src/cli.ts target",
+    "discover": "tsx src/cli.ts discover",
+    "replay": "tsx src/cli.ts replay"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.3"
+  }
+}

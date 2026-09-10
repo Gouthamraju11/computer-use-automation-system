@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-09-10T21-27-35-516Z-554d0f65",
+  "code": "MEMBER_NOT_FOUND",
+  "message": "No member exists for the supplied member number",
+  "stepId": "step-03",
+  "outputs": {}
+}

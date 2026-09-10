@@ -1,0 +1,241 @@
+{
+  "schemaVersion": "1.0",
+  "capability": {
+    "id": "look-up-member-value-and-read-their-current-savings-ba-200ade83",
+    "name": "look-up-member-value-and-read-their-current-savings-ba",
+    "description": "Look up member {{memberId}} and read their current savings balance",
+    "revision": 1,
+    "approval": "draft",
+    "recordedAt": "2026-09-10T20:15:45.232Z"
+  },
+  "target": {
+    "adapter": "web",
+    "appId": "heritage-core-member-servicing",
+    "baseOrigin": "http://127.0.0.1:4173",
+    "entryPath": "/",
+    "vendorProduct": "heritage-core-7",
+    "compatibleVersions": [
+      "7.x"
+    ],
+    "tenantOverrides": {}
+  },
+  "contract": {
+    "inputs": {
+      "memberId": {
+        "type": "string",
+        "description": "Invocation-specific memberId",
+        "sensitive": true,
+        "required": true
+      }
+    },
+    "outputs": {
+      "savingsBalance": {
+        "type": "number",
+        "description": "Read the current savings balance from the member record.",
+        "sourceStepId": "step-04",
+        "sensitive": true
+      }
+    },
+    "resultVariants": [
+      "success",
+      "business_outcome",
+      "failure"
+    ]
+  },
+  "policy": {
+    "allowedOrigins": [
+      "http://127.0.0.1:4173",
+      "http://localhost:4173"
+    ],
+    "allowedRoutePatterns": [
+      "^/$",
+      "^/results$",
+      "^/member/[0-9]+$"
+    ],
+    "allowedActions": [
+      "navigate",
+      "click",
+      "type",
+      "extract",
+      "wait"
+    ],
+    "riskyControlPatterns": [
+      "confirm",
+      "submit transfer",
+      "close account",
+      "delete",
+      "send payment"
+    ],
+    "blockedInputPatterns": [
+      "password",
+      "token",
+      "secret",
+      "ssn",
+      "social security"
+    ],
+    "maxSteps": 12,
+    "timeoutMs": 60000
+  },
+  "steps": [
+    {
+      "id": "step-01",
+      "description": "Enter the supplied member number in the Member number field.",
+      "risk": "safe",
+      "target": {
+        "strategies": [
+          {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Member number",
+            "exact": true
+          },
+          {
+            "kind": "label",
+            "label": "Member number",
+            "exact": true
+          },
+          {
+            "kind": "name",
+            "name": "memberId"
+          },
+          {
+            "kind": "css",
+            "selector": "#member-number"
+          }
+        ],
+        "robustness": "Semantic role/name first, associated label or name second, structural CSS only as a final fallback."
+      },
+      "timeoutMs": 10000,
+      "action": "type",
+      "value": {
+        "source": "parameter",
+        "name": "memberId"
+      }
+    },
+    {
+      "id": "step-02",
+      "description": "Search for the supplied member number.",
+      "risk": "safe",
+      "target": {
+        "strategies": [
+          {
+            "kind": "role",
+            "role": "button",
+            "name": "Search members",
+            "exact": true
+          },
+          {
+            "kind": "text",
+            "text": "Search members",
+            "exact": true
+          },
+          {
+            "kind": "css",
+            "selector": "button[type=\"submit\"]"
+          }
+        ],
+        "robustness": "Semantic role/name first, associated label or name second, structural CSS only as a final fallback."
+      },
+      "timeoutMs": 10000,
+      "action": "click"
+    },
+    {
+      "id": "step-03",
+      "description": "Open the member record for the matching member.",
+      "risk": "safe",
+      "target": {
+        "strategies": [
+          {
+            "kind": "role",
+            "role": "link",
+            "name": "Open member",
+            "exact": true
+          },
+          {
+            "kind": "text",
+            "text": "Open member",
+            "exact": true
+          },
+          {
+            "kind": "css",
+            "selector": "a"
+          }
+        ],
+        "robustness": "Semantic role/name first, associated label or name second, structural CSS only as a final fallback."
+      },
+      "timeoutMs": 10000,
+      "action": "click"
+    },
+    {
+      "id": "step-04",
+      "description": "Read the current savings balance from the member record.",
+      "risk": "safe",
+      "target": {
+        "strategies": [
+          {
+            "kind": "table_cell",
+            "rowLabel": "Savings balance",
+            "column": 1
+          }
+        ],
+        "robustness": "Finds the value by its stable row label, never by the runtime value."
+      },
+      "timeoutMs": 10000,
+      "action": "extract",
+      "outputName": "savingsBalance",
+      "outputType": "number",
+      "parser": "currency"
+    }
+  ],
+  "successCondition": {
+    "kind": "text_present",
+    "text": "Member Details"
+  },
+  "exceptionRules": [
+    {
+      "id": "member-not-found",
+      "category": "business_outcome",
+      "whenTextPresent": "No member found",
+      "code": "MEMBER_NOT_FOUND",
+      "message": "No member exists for the supplied member number"
+    },
+    {
+      "id": "session-expired",
+      "category": "recoverable",
+      "whenTextPresent": "Session expired",
+      "maxAttempts": 1,
+      "recovery": {
+        "kind": "click",
+        "target": {
+          "strategies": [
+            {
+              "kind": "role",
+              "role": "link",
+              "name": "Resume session",
+              "exact": true
+            },
+            {
+              "kind": "text",
+              "text": "Resume session",
+              "exact": true
+            }
+          ],
+          "robustness": "Stable operator-facing recovery label with a text fallback."
+        }
+      }
+    },
+    {
+      "id": "permission-denied",
+      "category": "hard_failure",
+      "whenTextPresent": "Permission denied",
+      "code": "PERMISSION_DENIED",
+      "message": "The active operator is not authorized to view this record"
+    }
+  ],
+  "provenance": {
+    "discoveryRunId": "discovery-2026-09-10T20-15-11-008Z-d03871e1",
+    "modelProvider": "model-cli",
+    "model": "gpt-5.6-luna",
+    "rawTranscriptPersisted": false
+  }
+}
